@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Pure HTML/JS Tetrahedron</title>
+    <style>
+        body { margin: 0; background: #fff; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; font-family: sans-serif; }
+        svg { width: 100vw; height: 100vh; cursor: move; }
+        /* stroke-width を 0.3 にして極細に設定 */
+        .face { 
+            fill: rgba(220, 220, 220, 0.2); 
+            stroke: #999; 
+            stroke-width: 0.3; 
+            stroke-linejoin: round; 
+            vector-effect: non-scaling-stroke;
+        }
+        #info { position: absolute; top: 10px; left: 10px; pointer-events: none; color: #999; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div id="info">DRAG TO ROTATE</div>
+    <svg id="viewport" viewBox="-2 -2 4 4"></svg>
+
+    <script>
+        const svg = document.getElementById('viewport');
+
+        // 1. 正四面体の4つの頂点座標
+        // (1, 1, 1), (1, -1, -1), (-1, 1, -1), (-1, -1, 1) の組み合わせ
+        let vertices = [
+            [ 1,  1,  1],
+            [ 1, -1, -1],
+            [-1,  1, -1],
+            [-1, -1,  1]
+        ];
+
+        // 2. 4つの面（三角形）を構成する頂点インデックス
+        const tetraFaces = [
+            [0, 1, 2],
+            [0, 1, 3],
+            [0, 2, 3],
+            [1, 2, 3]
+        ];
+
+        let angleX = 0.6, angleY = 0.4; // 初期角度
+
+        function project() {
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+            // 3D回転行列の適用
+            const rotated = vertices.map(v => {
+                let [x, y, z] = v;
+                // Y軸回転
+                let tx = x * Math.cos(angleY) + z * Math.sin(angleY);
+                let tz = -x * Math.sin(angleY) + z * Math.cos(angleY);
+                // X軸回転
+                let ty = y * Math.cos(angleX) - tz * Math.sin(angleX);
+                tz = y * Math.sin(angleX) + tz * Math.cos(angleX);
+                return [tx, ty, tz];
+            });
+
+            // 面の描画（Zソートで前後関係を正しく表示）
+            const faceData = tetraFaces.map(f => {
+                const pts = f.map(idx => rotated[idx]);
+                const avgZ = pts.reduce((sum, p) => sum + p[2], 0) / 3;
+                return { pts, avgZ };
+            }).sort((a, b) => a.avgZ - b.avgZ);
+
+            faceData.forEach(f => {
+                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                const pointsAttr = f.pts.map(p => `${p[0]},${p[1]}`).join(' ');
+                polygon.setAttribute('points', pointsAttr);
+                polygon.setAttribute('class', 'face');
+                svg.appendChild(polygon);
+            });
+        }
+
+        // マウス・タッチ操作
+        let isDragging = false, lastX, lastY;
+        const startDrag = e => { 
+            isDragging = true; 
+            lastX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX; 
+            lastY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY; 
+        };
+        const doDrag = e => {
+            if (!isDragging) return;
+            const curX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const curY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            angleY += (curX - lastX) * 0.01;
+            angleX += (curY - lastY) * 0.01;
+            lastX = curX; lastY = curY;
+            project();
+        };
+
+        window.addEventListener('mousedown', startDrag);
+        window.addEventListener('mousemove', doDrag);
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('touchstart', startDrag);
+        window.addEventListener('touchmove', doDrag);
+        window.addEventListener('touchend', () => isDragging = false);
+
+        project();
+    </script>
+</body>
+</html>
